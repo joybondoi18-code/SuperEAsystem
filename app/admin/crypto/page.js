@@ -1,16 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import CryptoReferenceTable from "@/components/CryptoReferenceTable";
 
 export default function AdminCryptoPage() {
   const [formData, setFormData] = useState({
     symbol: 'BTCUSDT',
-    timeframe: '15m',
     action: 'buy',
-    price: '',      // ✅ เปลี่ยนเป็น string ว่าง
-    lot: '',        // ✅ เปลี่ยนเป็น string ว่าง
-    sl: '',         // ✅ เปลี่ยนเป็น string ว่าง
-    tp: ''          // ✅ เปลี่ยนเป็น string ว่าง
+    lot: ''
   });
   
   const [loading, setLoading] = useState(false);
@@ -23,15 +20,30 @@ export default function AdminCryptoPage() {
     setError(null);
     setResult(null);
     
+    // ✅ ตรวจสอบข้อมูลก่อนส่ง
+    const lotValue = parseFloat(formData.lot);
+    
+    if (!formData.symbol) {
+      setError('กรุณากรอกคู่เหรียญ');
+      setLoading(false);
+      return;
+    }
+    
+    if (isNaN(lotValue) || lotValue <= 0) {
+      setError('กรุณากรอกจำนวน Lot ให้ถูกต้อง (ตัวเลขมากกว่า 0)');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      // ✅ แปลงค่าก่อนส่ง
+      // ✅ ส่งแค่ symbol, action, lot (ไม่ต้องมี price, timeframe, sl, tp)
       const dataToSend = {
-        ...formData,
-        price: parseFloat(formData.price) || 0,
-        lot: parseFloat(formData.lot) || 0,
-        sl: formData.sl ? parseFloat(formData.sl) : null,
-        tp: formData.tp ? parseFloat(formData.tp) : null
+        symbol: formData.symbol.toUpperCase(),
+        action: formData.action,
+        lot: lotValue
       };
+      
+      console.log('📤 Sending crypto signal:', dataToSend);
       
       const res = await fetch('/api/admin/signal', {
         method: 'POST',
@@ -43,6 +55,8 @@ export default function AdminCryptoPage() {
       
       if (res.ok) {
         setResult(data);
+        // รีเซ็ตฟอร์ม
+        setFormData({ symbol: 'BTCUSDT', action: 'buy', lot: '' });
       } else {
         setError(data.error || 'เกิดข้อผิดพลาด');
       }
@@ -57,7 +71,7 @@ export default function AdminCryptoPage() {
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-yellow-400 mb-6">
-          🎮 Admin Crypto - ส่งสัญญาณเทรด
+          🎮 Admin Crypto - ส่งสัญญาณเทรด (Spot)
         </h1>
         
         <form onSubmit={handleSubmit} className="bg-gray-800 rounded-lg p-6 space-y-4">
@@ -68,25 +82,9 @@ export default function AdminCryptoPage() {
               value={formData.symbol}
               onChange={(e) => setFormData({...formData, symbol: e.target.value.toUpperCase()})}
               className="w-full p-2 bg-gray-700 rounded text-white"
-              placeholder="BTCUSDT"
+              placeholder="BTCUSDT, XRPUSDT"
               required
             />
-          </div>
-          
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Timeframe</label>
-            <select
-              value={formData.timeframe}
-              onChange={(e) => setFormData({...formData, timeframe: e.target.value})}
-              className="w-full p-2 bg-gray-700 rounded text-white"
-            >
-              <option value="1m">1m</option>
-              <option value="5m">5m</option>
-              <option value="15m">15m</option>
-              <option value="1h">1h</option>
-              <option value="4h">4h</option>
-              <option value="1d">1d</option>
-            </select>
           </div>
           
           <div>
@@ -116,19 +114,6 @@ export default function AdminCryptoPage() {
           </div>
           
           <div>
-            <label className="block text-sm text-gray-300 mb-1">ราคา (Price)</label>
-            <input
-              type="number"
-              step="any"
-              value={formData.price}
-              onChange={(e) => setFormData({...formData, price: e.target.value})}
-              className="w-full p-2 bg-gray-700 rounded text-white"
-              placeholder="69000"
-              required
-            />
-          </div>
-          
-          <div>
             <label className="block text-sm text-gray-300 mb-1">จำนวน (Lot)</label>
             <input
               type="number"
@@ -136,33 +121,12 @@ export default function AdminCryptoPage() {
               value={formData.lot}
               onChange={(e) => setFormData({...formData, lot: e.target.value})}
               className="w-full p-2 bg-gray-700 rounded text-white"
-              placeholder="0.001"
+              placeholder="0.5"
               required
             />
-          </div>
-          
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Stop Loss (optional)</label>
-            <input
-              type="number"
-              step="any"
-              value={formData.sl}
-              onChange={(e) => setFormData({...formData, sl: e.target.value})}
-              className="w-full p-2 bg-gray-700 rounded text-white"
-              placeholder="68000"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Take Profit (optional)</label>
-            <input
-              type="number"
-              step="any"
-              value={formData.tp}
-              onChange={(e) => setFormData({...formData, tp: e.target.value})}
-              className="w-full p-2 bg-gray-700 rounded text-white"
-              placeholder="70000"
-            />
+            <p className="text-xs text-gray-400 mt-1">
+              💡 เช่น 0.5 = ครึ่งเหรียญ, 1 = 1 เหรียญ (USDT)
+            </p>
           </div>
           
           <button
@@ -173,6 +137,9 @@ export default function AdminCryptoPage() {
             {loading ? 'กำลังส่งสัญญาณ...' : '📡 ส่งสัญญาณเทรด'}
           </button>
         </form>
+
+        {/* ✅ ตารางอ้างอิง Lot (วางใต้ฟอร์ม) */}
+        <CryptoReferenceTable />
         
         {error && (
           <div className="mt-4 p-4 bg-red-900/50 border border-red-500 rounded text-red-400">

@@ -1,0 +1,33 @@
+✅ คู่มือติดตั้ง EA (แบบง่าย 5 ขั้นตอน)
+ดาวน์โหลดไฟล์ EA
+กดปุ่มดาวน์โหลดที่หน้าเว็บหลังตรวจสอบสำเร็จ จะได้ไฟล์ .mq5
+
+ย้ายไฟล์ไปที่โฟลเดอร์ Experts
+
+เปิด MT5 → File → Open Data Folder
+
+ไปที่ MQL5 → Experts
+
+วางไฟล์ EA ที่ดาวน์โหลดลงในโฟลเดอร์นี้
+
+Compile ไฟล์ EA
+
+ใน MT5 กด F4 (เปิด MetaEditor)
+
+เปิดไฟล์ EA ที่วางไว้ (จะอยู่ใน Experts)
+
+กด F7 เพื่อ Compile (รอจนขึ้น success)
+
+ลาก EA ลงกราฟ
+ปิด MetaEditor กลับไปที่ MT5 → ลาก EA จาก Navigator วางบนกราฟที่ต้องการ
+
+ตั้งค่า WebRequest (ครั้งเดียว)
+
+Tools → Options → Expert Advisors
+
+ติ๊ก ✅ Allow WebRequest for listed URLs
+
+คลิก Add → ใส่ URL หรือ IP ตามที่หน้าเว็บแสดง (เช่น https://yourdomain.com) → OK
+
+🎉 แค่นี้ EA ก็ทำงานได้เลย! (ถ้ายังไม่ได้ ตรวจสอบว่า Auto Trading เปิดอยู่)
+

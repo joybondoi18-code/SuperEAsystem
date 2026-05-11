@@ -1,393 +1,201 @@
 //+------------------------------------------------------------------+
-//| SuperEA_Follower_API_v7.0.mq5                                    |
-//| ตรวจสอบ Login ผ่าน API /api/signal-ea + เทรดตาม Global Signal    |
+//|        XM EA - Pending Order (รับ price, sl, tp, lot จาก Admin) |
+//|        Auto SL/TP เมื่อ Admin ไม่ส่ง sl,tp                       |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "7.0"
-#property copyright "SuperEA"
-#property link      ""
+#property version "2.4"
 
-// ===================== INPUT PARAMETERS =====================
-input string   API_URL = "https://yourdomain.com/api/signal-ea";
+#include <Trade/Trade.mqh>
+CTrade trade;
+
+input string LOGIN_API  = "https://supertrade-ea.com/api/check";
+input string SIGNAL_API = "https://supertrade-ea.com/api/signal-ib";
 input int      PollingInterval = 5;
-input int      DeviationPoints = 200;
 input double   RiskPercent = 10.0;
 input bool     UseFixedLot = false;
-input double   FixedLot = 0.1;
-input bool     DebugMode = true;
+input double   FixedLot = 0.01;
+input bool     Debug = true;
 
-// ===================== GLOBAL VARIABLES =====================
-string g_login = "";
-string g_broker = "";
+string g_login;
 bool   g_verified = false;
-string g_lastTimestamp = "";
 
-//+------------------------------------------------------------------+
-//| Expert initialization function                                   |
-//+------------------------------------------------------------------+
 int OnInit()
 {
    g_login = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   g_broker = AccountInfoString(ACCOUNT_COMPANY);
-   
-   Print("╔══════════════════════════════════════════════════════════╗");
-   Print("║     SUPER EA FOLLOWER API v7.0 STARTED                  ║");
-   Print("╠══════════════════════════════════════════════════════════╣");
-   Print("║ Account Login: ", g_login);
-   Print("║ Broker: ", g_broker);
-   Print("║ API URL: ", API_URL);
-   Print("║ Polling Interval: ", PollingInterval, " seconds");
-   Print("╚══════════════════════════════════════════════════════════╝");
-   
-   // ✅ ตรวจสอบ Login กับ API
-   if(CheckLoginWithAPI())
-   {
-      g_verified = true;
-      Print("✅ IB VERIFICATION PASSED — EA can trade");
-      Comment("✅ Verified | Waiting for signals...");
-   }
-   else
-   {
-      g_verified = false;
-      Print("❌ IB VERIFICATION FAILED — EA will NOT trade");
-      Comment("❌ Login not registered\nPlease open account via our link");
-      return INIT_FAILED;
-   }
-   
-   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
-   {
-      Print("⚠️ WARNING: Auto Trading is OFF!");
-      Comment("⚠️ Auto Trading OFF! Please enable it.");
-   }
-   
+   Print("🚀 XM PENDING EA STARTED | Login: ", g_login);
+   if(UseFixedLot) Print("   Using Fixed Lot: ", FixedLot);
+   else Print("   Using RiskPercent: ", RiskPercent, "%");
+   if(CheckLogin()) { g_verified = true; Print("✅ Login verified"); }
+   else Print("❌ Login not verified");
    EventSetTimer(PollingInterval);
    return INIT_SUCCEEDED;
 }
 
-//+------------------------------------------------------------------+
-//| Expert deinitialization function                                 |
-//+------------------------------------------------------------------+
-void OnDeinit(const int reason)
-{
-   EventKillTimer();
-   Print("EA Stopped. Reason: ", reason);
-   Comment("");
-}
-
-//+------------------------------------------------------------------+
-//| Timer function — ตรวจสอบและรับสัญญาณ                             |
-//+------------------------------------------------------------------+
+void OnDeinit(int reason) { EventKillTimer(); }
 void OnTimer()
 {
-   if(!g_verified)
-   {
-      // ถ้ายังไม่ verified ให้ลองตรวจสอบอีกครั้ง (เผื่อ Login ถูกเพิ่มทีหลัง)
-      if(CheckLoginWithAPI())
-      {
-         g_verified = true;
-         Print("✅ IB VERIFICATION PASSED (re-check)");
-         Comment("✅ Verified | Waiting for signals...");
+   if(!g_verified) g_verified = CheckLogin();
+   else FetchSignal();
+}
+
+bool CheckLogin()
+{
+   string url = LOGIN_API + "?mt5_login=" + g_login;
+   char result[], postData[];
+   string headers;
+   ResetLastError();
+   int res = WebRequest("GET", url, headers, 5000, postData, result, headers);
+   if(res != 200) { if(Debug) Print("❌ Login HTTP: ", res); return false; }
+   string response = CharArrayToString(result);
+   if(Debug) Print("📨 Login: ", response);
+   return StringFind(response, "\"status\":\"allow\"") >= 0;
+}
+
+void FetchSignal()
+{
+   char result[], postData[];
+   string headers;
+   ResetLastError();
+   int res = WebRequest("GET", SIGNAL_API, headers, 5000, postData, result, headers);
+   if(res != 200) { if(Debug) Print("❌ Signal HTTP: ", res); return; }
+   string response = CharArrayToString(result);
+   if(Debug) Print("📨 Signal: ", response);
+   if(StringFind(response, "\"status\":\"ok\"") < 0) return;
+
+   string type = GetJSONValue(response, "type");
+   if(type != "pending") return;
+
+   string symbol = GetJSONValue(response, "symbol");
+   string side   = GetJSONValue(response, "side");
+   string priceStr = GetJSONValue(response, "price");
+   string slStr    = GetJSONValue(response, "sl");
+   string tpStr    = GetJSONValue(response, "tp");
+   string lotStr   = GetJSONValue(response, "lot");
+   string time     = GetJSONValue(response, "time");
+
+   // ✅ ต้องการ price เสมอ
+   if(symbol == "" || side == "" || priceStr == "") return;
+   static string lastTime = "";
+   if(time == lastTime) return;
+   lastTime = time;
+
+   double price = StringToDouble(priceStr);
+   double sl = 0, tp = 0;
+
+   // ✅ ถ้ามี sl, tp → ใช้ค่า ถ้าไม่มี → คำนวณเอง
+   if(slStr != "" && tpStr != "") {
+      sl = StringToDouble(slStr);
+      tp = StringToDouble(tpStr);
+      if(Debug) Print("📌 Manual SL/TP: SL=", sl, " TP=", tp);
+   } else {
+      double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+      if(side == "BUY") {
+         sl = price - 1000 * point;
+         tp = price + 2000 * point;
+      } else {
+         sl = price + 1000 * point;
+         tp = price - 2000 * point;
       }
-      return;
+      if(Debug) Print("⚙️ Auto SL/TP: SL=", sl, " TP=", tp);
    }
-   
-   // ✅ รับสัญญาณจาก Global Signal
-   FetchGlobalSignal();
+
+   double lot;
+   if(lotStr != "") {
+      lot = StringToDouble(lotStr);
+      if(lot < 0.01) lot = 0.01;
+      if(Debug) Print("📌 Using lot from API: ", lot);
+   }
+   else if(UseFixedLot) {
+      lot = FixedLot;
+      if(Debug) Print("📌 Using FixedLot: ", lot);
+   }
+   else {
+      lot = CalculateLot(symbol, price, sl);
+      if(Debug) Print("📌 Calculated lot: ", lot);
+   }
+
+   Print("🚀 Pending Signal: ", symbol, " ", side, " @", price, " Lot=", lot, " SL=", sl, " TP=", tp);
+   PlacePendingOrder(symbol, side, price, lot, sl, tp);
 }
 
-//+------------------------------------------------------------------+
-//| Tick function                                                    |
-//+------------------------------------------------------------------+
-void OnTick()
+double CalculateLot(string symbol, double price, double sl)
 {
-   // ไม่ต้องทำอะไร (ใช้ Timer แทน)
-}
-
-//+------------------------------------------------------------------+
-//| ตรวจสอบ Login กับ API /api/signal-ea                             |
-//+------------------------------------------------------------------+
-bool CheckLoginWithAPI()
-{
-   string login = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
-   string url = API_URL;
-   string headers = "Content-Type: application/json";
-   string body = "{\"login\":\"" + login + "\",\"broker\":\"xm\"}";
-   
-   char postData[];
-   StringToCharArray(body, postData);
-   
-   char responseData[];
-   string responseHeaders;
-   int timeout = 5000;
-   
-   int res = WebRequest("POST", url, headers, timeout, postData, responseData, responseHeaders);
-   
-   if(res != 200)
-   {
-      if(DebugMode) Print("⚠️ HTTP error: ", res);
-      return false;
-   }
-   
-   string response = CharArrayToString(responseData);
-   if(DebugMode) Print("📨 API Response: ", response);
-   
-   // ตรวจสอบว่า {"success":true}
-   if(StringFind(response, "\"success\":true") >= 0)
-   {
-      return true;
-   }
-   
-   return false;
-}
-
-//+------------------------------------------------------------------+
-//| ดึง Global Signal จาก API (ส่วนนี้คุณปรับตาม original ได้)         |
-//+------------------------------------------------------------------+
-void FetchGlobalSignal()
-{
-   // ⚠️ ส่วนนี้คุณจะใส่โค้ด Fetch สัญญาณจาก API ของคุณเอง
-   // ตัวอย่างง่ายๆ:
-   /*
-   string url = "https://your-signal-api.com/latest";
-   char result[];
-   string headers = "";
-   int res = WebRequest("GET", url, headers, 5000, NULL, result, headers);
-   
-   if(res == 200)
-   {
-      string json = CharArrayToString(result);
-      // แยก json แล้วเรียก OpenOrderSafe()
-   }
-   */
-   
-   // ตัวอย่าง dummy
-   if(DebugMode)
-   {
-      static int count = 0;
-      count++;
-      if(count % 60 == 0) Print("⏳ Waiting for global signal...");
-   }
-}
-
-// ===================== ส่วนจัดการการเทรด (จาก original ของคุณ) =====================
-
-//+------------------------------------------------------------------+
-//| แปลงเป็นตัวพิมพ์ใหญ่                                             |
-//+------------------------------------------------------------------+
-string ToUpper(string str)
-{
-   string result = "";
-   for(int i = 0; i < StringLen(str); i++)
-   {
-      int ch = StringGetCharacter(str, i);
-      if(ch >= 97 && ch <= 122) ch -= 32;
-      result += StringFormat("%c", ch);
-   }
-   return result;
-}
-
-//+------------------------------------------------------------------+
-//| ค้นหา Symbol อัตโนมัติ                                            |
-//+------------------------------------------------------------------+
-string FindSymbolAuto(string searchSymbol)
-{
-   searchSymbol = ToUpper(searchSymbol);
-   
-   for(int i = 0; i < SymbolsTotal(false); i++)
-   {
-      string sym = SymbolName(i, false);
-      string symUpper = ToUpper(sym);
-      
-      if(StringFind(symUpper, searchSymbol) >= 0)
-      {
-         Print("✅ Auto-found symbol: ", sym, " for ", searchSymbol);
-         return sym;
-      }
-   }
-   
-   return "";
-}
-
-//+------------------------------------------------------------------+
-//| แปลงชื่อสัญลักษณ์ตาม Broker                                      |
-//+------------------------------------------------------------------+
-string MapSymbolForBroker(string symbol)
-{
-   string broker = ToUpper(g_broker);
-   string originalSymbol = symbol;
-   symbol = ToUpper(symbol);
-   
-   if(symbol == "XAUUSD" || symbol == "GOLD")
-   {
-      if(StringFind(broker, "XM") >= 0) return "GOLD";
-      if(StringFind(broker, "EXNESS") >= 0) return "XAUUSDm";
-      return "XAUUSD";
-   }
-   
-   if(symbol == "EURUSD")
-   {
-      if(StringFind(broker, "XM") >= 0) return "EURUSDm";
-      return "EURUSD";
-   }
-   
-   if(symbol == "GBPUSD")
-   {
-      if(StringFind(broker, "XM") >= 0) return "GBPUSDm";
-      return "GBPUSD";
-   }
-   
-   if(symbol == "USDJPY")
-   {
-      if(StringFind(broker, "XM") >= 0) return "USDJPYm";
-      return "USDJPY";
-   }
-   
-   string autoSymbol = FindSymbolAuto(originalSymbol);
-   if(autoSymbol != "") return autoSymbol;
-   
-   return originalSymbol;
-}
-
-//+------------------------------------------------------------------+
-//| คำนวณ Lot Size                                                  |
-//+------------------------------------------------------------------+
-double CalculateLotSafe(string symbol, double entry_price, double sl_price)
-{
-   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-   double risk_amount = balance * RiskPercent / 100.0;
-   
+   double balance   = AccountInfoDouble(ACCOUNT_BALANCE);
+   double riskMoney = balance * RiskPercent / 100.0;
    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-   
-   if(point <= 0 || tick_value <= 0) return 0;
-   
-   double sl_points = MathAbs(entry_price - sl_price) / point;
-   if(sl_points < 1) sl_points = 1;
-   
-   double lot = risk_amount / (sl_points * tick_value);
-   return lot;
-}
-
-//+------------------------------------------------------------------+
-//| Normalize Lot                                                    |
-//+------------------------------------------------------------------+
-double NormalizeLot(string symbol, double lot)
-{
+   double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+   double slPoints = MathAbs(price - sl) / point;
+   if(slPoints < 1) slPoints = 1;
+   if(point <= 0 || tickValue <= 0) return 0.01;
+   double lot = riskMoney / (slPoints * tickValue);
    double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
    double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
    double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-   
-   if(lot <= 0 || lot < minLot) lot = minLot;
+   if(lot < minLot) lot = minLot;
    if(lot > maxLot) lot = maxLot;
-   
    if(lotStep > 0) lot = MathFloor(lot / lotStep) * lotStep;
-   lot = NormalizeDouble(lot, 2);
-   return lot;
+   return NormalizeDouble(lot, 2);
 }
 
-//+------------------------------------------------------------------+
-//| เปิดออเดอร์ (จาก original ของคุณ)                                 |
-//+------------------------------------------------------------------+
-bool OpenOrderSafe(string symbol, string side, double sl_price, double tp_price)
+void PlacePendingOrder(string symbol, string side, double price, double lot, double sl, double tp)
 {
-   string mappedSymbol = MapSymbolForBroker(symbol);
-   
-   if(mappedSymbol == "")
-   {
-      Print("❌ Invalid mapped symbol");
-      return false;
-   }
-   
-   if(!SymbolSelect(mappedSymbol, true))
-   {
-      Print("❌ Cannot select symbol: ", mappedSymbol);
-      return false;
-   }
-   
-   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
-   {
-      Print("❌ Auto Trading is disabled!");
-      return false;
-   }
-   
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED)) { Print("❌ Auto Trading disabled"); return; }
+   if(!SymbolSelect(symbol, true)) { Print("❌ Symbol not found: ", symbol); return; }
+
    MqlTick tick;
-   if(!SymbolInfoTick(mappedSymbol, tick))
-   {
-      Print("❌ Cannot get tick for ", mappedSymbol);
-      return false;
-   }
-   
-   double price;
+   if(!SymbolInfoTick(symbol, tick)) { Print("❌ Cannot get tick"); return; }
+
    ENUM_ORDER_TYPE type;
-   
-   if(ToUpper(side) == "BUY")
-   {
-      price = tick.ask;
-      type = ORDER_TYPE_BUY;
-   }
-   else if(ToUpper(side) == "SELL")
-   {
-      price = tick.bid;
-      type = ORDER_TYPE_SELL;
-   }
-   else
-   {
-      Print("❌ Invalid side: ", side);
-      return false;
-   }
-   
-   double lot;
-   if(UseFixedLot)
-   {
-      lot = FixedLot;
-   }
-   else
-   {
-      lot = CalculateLotSafe(mappedSymbol, price, sl_price);
-   }
-   
-   lot = NormalizeLot(mappedSymbol, lot);
-   if(lot <= 0)
-   {
-      Print("❌ Invalid lot: ", lot);
-      return false;
-   }
-   
-   int digits = (int)SymbolInfoInteger(mappedSymbol, SYMBOL_DIGITS);
-   double point = SymbolInfoDouble(mappedSymbol, SYMBOL_POINT);
-   
-   sl_price = NormalizeDouble(sl_price, digits);
-   tp_price = NormalizeDouble(tp_price, digits);
-   
+   if(side == "BUY") type = ORDER_TYPE_BUY_STOP;
+   else type = ORDER_TYPE_SELL_STOP;
+
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   price = NormalizeDouble(price, digits);
+   sl    = NormalizeDouble(sl, digits);
+   tp    = NormalizeDouble(tp, digits);
+
    MqlTradeRequest req = {};
-   MqlTradeResult res = {};
-   
-   req.action = TRADE_ACTION_DEAL;
-   req.symbol = mappedSymbol;
+   MqlTradeResult  res = {};
+   req.action = TRADE_ACTION_PENDING;
+   req.symbol = symbol;
    req.volume = lot;
    req.type = type;
    req.price = price;
-   req.sl = sl_price;
-   req.tp = tp_price;
-   req.deviation = DeviationPoints;
-   req.magic = 0;
-   req.comment = "SuperEA-v7.0";
-   req.type_filling = ORDER_FILLING_FOK;
-   
-   if(!OrderSend(req, res))
+   req.sl = sl;
+   req.tp = tp;
+   req.deviation = 200;
+   req.comment = "XM Pending Order";
+   req.type_filling = ORDER_FILLING_RETURN;
+
+   if(OrderSend(req, res))
    {
-      Print("❌ OrderSend Error: ", GetLastError());
-      return false;
+      if(res.retcode == TRADE_RETCODE_DONE)
+         Print("✅ Pending order placed | Ticket: ", res.order);
+      else
+         Print("❌ Pending order failed | Retcode: ", res.retcode);
    }
-   
-   if(res.retcode != TRADE_RETCODE_DONE)
-   {
-      Print("❌ Order Rejected: ", res.retcode);
-      return false;
-   }
-   
-   Print("✅ ORDER SUCCESS! Ticket: ", res.order);
-   return true;
+   else Print("❌ OrderSend error: ", GetLastError());
 }
 
-//+------------------------------------------------------------------+ 
+string GetJSONValue(string json, string key)
+{
+   string search = "\"" + key + "\":";
+   int pos = StringFind(json, search);
+   if(pos < 0) return "";
+   pos += StringLen(search);
+   while(pos < StringLen(json))
+   {
+      char c = StringGetCharacter(json, pos);
+      if(c != '"' && c != ' ' && c != ':') break;
+      pos++;
+   }
+   string out = "";
+   while(pos < StringLen(json))
+   {
+      char c = StringGetCharacter(json, pos);
+      if(c == '"' || c == ',' || c == '}') break;
+      out += CharToString(c);
+      pos++;
+   }
+   return out;
+}

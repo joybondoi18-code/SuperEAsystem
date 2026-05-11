@@ -71,8 +71,17 @@ export default function ForexPage() {
   const isExpired = !me.isActive || (me.planExpiresAt && new Date(me.planExpiresAt) < new Date());
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">🤖 Forex Bot</h1>
+  <div className="max-w-2xl mx-auto p-6">
+    {/* Header พร้อมปุ่มประวัติ */}
+    <div className="flex justify-between items-center mb-6">
+      <h1 className="text-2xl font-bold">🤖 Forex Bot</h1>
+      <button
+        onClick={() => router.push('/bots/forex/history')}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+      >
+        📜 ประวัติการส่งสัญญาณ
+      </button>
+    </div>
 
       {/* ✅ กรณีหมดอายุ */}
       {isExpired ? (
@@ -116,21 +125,24 @@ export default function ForexPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">API URL (ตั้งค่า WebRequest)</label>
+            <label className="block text-sm font-medium mb-1">API URL (ตั้งค่า WebRequest)ไปที่เครื่องมือ-ไปที่ตัวเลือก-นำ"https://ไปใส่</label>
             <input
               readOnly
-              value="http://192.168.100.160:3000/api/ea/signal"
+              value="https://supertrade-ea.com/api/ea/signal"
               className="w-full bg-gray-700 p-2 rounded"
             />
           </div>
 
-          <div className="border-t border-gray-700 pt-4">
+  <div className="border-t border-gray-700 pt-4">
   <h3 className="font-semibold mb-2">📥 ดาวน์โหลด EA</h3>
   
-  <a href="/downloads/SuperEA44.mq5" download className="btn bg-blue-600 w-full text-center block">
-  📥 ดาวน์โหลด EA (.mq5)
-</a>
-  
+  {/* ✅ EA ตัวใหม่ (Pending Order) */}
+  <a href="/downloads/SuperEA_Pending_v1.1.mq5" download className="btn bg-purple-600 hover:bg-purple-700 w-full text-center block">
+    📥 ดาวน์โหลด EA (Pending -ตั้งราคารอ )
+  </a>
+   <p className="text-xs text-gray-500 mt-1">
+    • เหมาะกับทุกโบรก,แค่เปิดคอมรับอ๋อเดอร์แล้วปิดคอมได้ ไม่ต้องเปิดคอมทิ้งทั้งวัน ระบบจะเปิดออเดอร์ให้เอง 
+  </p>
   
   <p className="text-xs text-gray-400 mt-2">
     💡 วิธีติดตั้ง: ดาวน์โหลด → เปิด MT5 กด F4 → File → Open → เลือกไฟล์ .mq5 → กด Compile (F7) → ลาก EA ลงกราฟ
@@ -144,7 +156,7 @@ export default function ForexPage() {
     <li>เปิด MT5 → กด F4→ File → Open → เลือกไฟล์ .mq5 → กด Compile (F7) </li>
     <li>กลับมาที่MT5 → Navigator ข้างๆ →  ลาก EA ลงกราฟ </li>
     <li>ลาก EA ลงบนกราฟ → ใส่ API Key ที่คัดลอกไว้ → แล้วกำนดค่าlot/กำนดRisk→ OK</li>
-    <li>แล้วไปที่เครื่องมือ  → ตัวเลือกแล้วใส่ URL: http://192.168.43.217:3000/api/ea/signal</li>
+    <li>แล้วไปที่เครื่องมือ  → ตัวเลือกแล้วใส่ URL: https://supertrade-ea.com/api/ea/signal</li>
   </ol>
 </div>
 
@@ -184,7 +196,7 @@ export default function ForexPage() {
   </div>
 
   <div>
-    <label className="block text-sm font-medium mb-1">MT5 Account Number</label>
+    <label className="block text-sm font-medium mb-1">MT5 Account (login)</label>
     <input
       type="text"
       id="mt5Login"

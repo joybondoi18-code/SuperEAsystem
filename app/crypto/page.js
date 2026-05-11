@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useBotStore } from "./store";
+import SidebarForm from "./SidebarForm";
 
 export default function Page() {
   const { symbol, timeframe } = useBotStore();
@@ -171,9 +172,11 @@ export default function Page() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  return (
-    <div className="p-6 text-gray-300">
-      <h1 className="text-2xl text-yellow-400 mb-4 font-bold">
+return (
+  <div className="p-4 md:p-6 text-gray-300">
+    {/* Chart อย่างเดียว */}
+    <div>
+      <h1 className="text-xl md:text-2xl text-yellow-400 mb-3 font-bold">
         📊 กราฟแท่งเทียน {symbol} ({timeframe})
       </h1>
 
@@ -183,11 +186,14 @@ export default function Page() {
         <>
           <div
             ref={chartContainerRef}
-            className="mt-6 bg-gray-900 p-4 rounded-lg shadow-lg h-[500px]"
+            className="mt-2 bg-gray-900 p-2 md:p-4 rounded-lg shadow-lg h-[400px] md:h-[500px]"
           />
-          <p className="mt-3 text-sm text-cyan-400 text-center">{statusMessage}</p>
+          <p className="mt-3 text-xs md:text-sm text-cyan-400 text-center">
+            {statusMessage}
+          </p>
         </>
       )}
     </div>
-  );
+  </div>
+);
 }

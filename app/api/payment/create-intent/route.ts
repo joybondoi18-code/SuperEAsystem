@@ -1,22 +1,17 @@
 // app/api/payment/create-intent/route.ts
 import { NextResponse } from "next/server";
 import { getAuth } from "@/lib/auth";
-import { createBinancePayIntent } from "@/lib/payment/binance";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   const auth = await getAuth();
   if (!auth) return NextResponse.json({ error: "not auth" }, { status: 401 });
 
-  const { method, amount, packageType } = await req.json(); // ✅ รับ packageType
+  const { method, amount, packageType } = await req.json();
   
   if (method === "binance") {
-    // ✅ ส่ง packageType ไปด้วย
-    const intent = await createBinancePayIntent({ 
-      amount: amount || 20, 
-      currency: "USDT",
-      packageType: packageType,
-    });
+    // ✅ สร้าง Order ID เอง (ไม่ต้องเรียก Binance Pay)
+    const orderId = `ORDER_${Date.now()}_${auth.uid}_${Math.random().toString(36).slice(2, 8)}`;
     
     // ✅ บันทึก transaction ลง database
     const tx = await prisma.transaction.create({
@@ -26,18 +21,18 @@ export async function POST(req: Request) {
         amount: amount || 20,
         method: "binance",
         status: "pending",
-        txHash: intent.orderId,
-        qrcodeUrl: intent.qrCodeContent,
-        packageType: packageType, // ✅ บันทึก packageType
+        txHash: orderId,
+        // qrcodeUrl ไม่ต้องบันทึก เพราะหน้า PaymentStatus จะสร้าง QR เอง
+        packageType: packageType,
       },
     });
     
+    // ✅ ส่ง orderId กลับไป (ไม่ต้องส่ง qrCodeContent)
     return NextResponse.json({ 
       success: true, 
       method, 
       intent: {
-        orderId: intent.orderId,
-        qrCodeContent: intent.qrCodeContent,
+        orderId: orderId,
       },
       transactionId: tx.id,
     });

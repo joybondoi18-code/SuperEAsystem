@@ -27,8 +27,15 @@ export async function getActiveCustomers() {
   }
 }
 
-function calculateLot(balance, price) {
-  // ทดสอบด้วย Lot คงที่ 0.001 BTC
+// ✅ แก้ไข: รับ requestedLot และใช้ค่านั้น (ถ้ามี)
+function calculateLot(balance, requestedLot) {
+  // ถ้า Admin ส่ง lot มา → ใช้ค่านั้น (Binance จะตรวจสอบ minLot อีกที)
+  if (requestedLot && requestedLot > 0) {
+    console.log(`🔍 [CentralEngine] ใช้ requestedLot: ${requestedLot}`);
+    return requestedLot;
+  }
+  // ยังคงค่า default 0.001 สำหรับกรณีที่ไม่มี lot ส่งมา
+  console.log(`🔍 [CentralEngine] ไม่มี requestedLot ใช้ default: 0.001`);
   return 0.001;
 }
 
@@ -41,7 +48,8 @@ export async function executeForAllCustomers(signal) {
   }
 
   console.log(`🚀 ส่งออเดอร์ ${signal.action} ให้ลูกค้า ${customers.length} ราย`);
-  console.log(`📊 สัญญาณ: ${signal.action} ${signal.symbol} @ ${signal.price}`);
+  console.log(`📊 สัญญาณ: ${signal.action} ${signal.symbol}`);
+  console.log(`🔍 Signal object:`, JSON.stringify(signal, null, 2));
 
   const results = [];
 
@@ -62,18 +70,19 @@ export async function executeForAllCustomers(signal) {
       // ✅ ถอดรหัส Secret Key
       const realSecret = decryptSecret(customer.binanceSecretKey);
       
-      const lot = calculateLot(customer.balance || 1000, signal.price);
+      // ✅ แก้ไข: ส่ง signal.lot เข้าไปใน calculateLot (ไม่ต้องส่ง price)
+      const lot = calculateLot(customer.balance || 1000, signal.lot);
       
       console.log(`\n📤 [${customer.email}] กำลังส่งออเดอร์...`);
+      console.log(`🔍 Final lot: ${lot}`);
       
+      // ✅ ส่ง order (ไม่ต้องมี sl, tp)
       const order = await binanceOrder({
         apiKey: customer.binanceApiKey,
         secretKey: realSecret,
         side: signal.action,
         symbol: signal.symbol,
-        amount: lot,
-        sl: signal.sl,
-        tp: signal.tp
+        amount: lot
       });
 
       console.log(`✅ [${customer.email}] ส่งออเดอร์สำเร็จ!`);

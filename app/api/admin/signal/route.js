@@ -6,12 +6,12 @@ export async function POST(req) {
     const body = await req.json();
     console.log('📡 Admin signal received:', body);
     
-    const { symbol, timeframe, action, price, lot, sl, tp } = body;
+    const { symbol, action, lot } = body;
     
-    // ตรวจสอบข้อมูล
-    if (!symbol || !action || !price || !lot) {
+    // ✅ ตรวจสอบข้อมูล (ไม่ต้องมี price, timeframe, sl, tp)
+    if (!symbol || !action || !lot) {
       return new Response(
-        JSON.stringify({ error: 'กรุณากรอกข้อมูลให้ครบ (symbol, action, price, lot)' }),
+        JSON.stringify({ error: 'กรุณากรอกข้อมูลให้ครบ (symbol, action, lot)' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -31,19 +31,18 @@ export async function POST(req) {
       );
     }
     
+    const lotValue = parseFloat(lot);
+    
     console.log(`\n🎮 ===== ADMIN ส่งสัญญาณเทรด =====`);
-    console.log(`📊 สัญญาณ: ${action.toUpperCase()} ${symbol} @ ${price}`);
-    console.log(`📦 จำนวน: ${lot} | SL: ${sl || '-'} | TP: ${tp || '-'}`);
+    console.log(`📊 สัญญาณ: ${action.toUpperCase()} ${symbol}`);
+    console.log(`📦 จำนวน: ${lotValue}`);
     console.log(`👥 ส่งให้ลูกค้า ${customers.length} ราย`);
     
-    // สร้างสัญญาณ
+    // ✅ สร้างสัญญาณ (ไม่มี price, sl, tp)
     const signal = {
       action: action.toLowerCase(),
       symbol: symbol.toUpperCase(),
-      price: parseFloat(price),
-      sl: sl ? parseFloat(sl) : null,
-      tp: tp ? parseFloat(tp) : null,
-      lot: parseFloat(lot)
+      lot: lotValue
     };
     
     // ✅ ส่ง order ให้ลูกค้าทุกคน (แค่ครั้งเดียว)
@@ -57,7 +56,7 @@ export async function POST(req) {
     console.log(`📊 ผลสรุป: สำเร็จ ${successCount} ราย / ล้มเหลว ${failCount} ราย`);
     console.log(`⏱️ ใช้เวลา: ${elapsed}ms`);
     
-    // ✅ บันทึกสัญญาณผ่าน API
+    // ✅ บันทึกสัญญาณผ่าน API (ไม่ต้องมี price, timeframe)
     try {
       await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/signals/add`, {
         method: 'POST',
@@ -65,9 +64,7 @@ export async function POST(req) {
         body: JSON.stringify({
           action: action.toUpperCase(),
           symbol: symbol.toUpperCase(),
-          timeframe: timeframe,
-          price: parseFloat(price),
-          reason: `สัญญาณเทรด (Lot: ${lot})`  
+          reason: `สัญญาณเทรด Crypto Spot (Lot: ${lotValue})`
         })
       });
       console.log(`📝 บันทึกสัญญาณจาก Admin: ${action} ${symbol}`);

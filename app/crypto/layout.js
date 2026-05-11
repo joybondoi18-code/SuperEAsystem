@@ -100,7 +100,8 @@ export default function CryptoLayout({ children }) {
             </ul>
           </nav>
 
-          <div className="hidden lg:block mt-auto">
+          {/* ✅ แก้ไข: เปลี่ยนจาก hidden lg:block เป็น block เพื่อให้แสดงบนมือถือ */}
+          <div className="block mt-auto">
             <div className="border-t border-gray-800 my-3" />
             <SidebarForm />
           </div>

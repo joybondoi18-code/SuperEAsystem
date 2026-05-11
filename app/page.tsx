@@ -9,9 +9,9 @@ export default function Home() {
       </h1>
 
         <p className="text-slate-300 mt-3 text-xs sm:text-sm md:text-base">
-          🚀 สมัครใช้งานฟรี
+          🚀 สมัครใช้งานฟรี 30 วัน
           <br className="block sm:hidden" />
-          🚀 มีรูปแบบการใช้งานหลากหลายให้เลือก
+          🚀 รองรับการใช้งานหลายรูปแบบตามความสะดวกของคุณ
           <br className="block sm:hidden" />
           
         </p>
@@ -19,20 +19,21 @@ export default function Home() {
         {/* ✅ กลยุทธ์ของระบบ (responsive) */}
         <div className="mt-6 p-4 sm:p-5 bg-gray-800/70 border-l-4 border-green-500 rounded-md shadow-md">
           <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-400 mb-2">
-            🎯 กลยุทธ์ของระบบ:
+            🎯 แนวคิดการทำงานของระบบ
           </p>
-          <ul className="list-disc list-inside text-sm sm:text-base md:text-lg text-slate-200 space-y-1">
-            <li>ไม่เทรดมั่ว</li>
-            <li>ไม่ฝืนตลาด</li>
-            <li>เลือกเฉพาะจังหวะที่ได้เปรียบจริง</li>
+           <ul className="list-disc list-inside text-sm sm:text-base md:text-lg text-slate-200 space-y-1">
+            <li>ไม่เปิดออเดอร์โดยไม่มีเหตุผล</li>
+            <li>ไม่ฝืนแนวโน้มของตลาด</li>
+            <li>เลือกเฉพาะจังหวะที่มีความได้เปรียบสูง</li>
           </ul>
           <p className="text-sm sm:text-base md:text-lg text-slate-200 mt-3">
-            📊 ดังนั้นบางช่วงอาจไม่มีออเดอร์<br />
-            แต่นั่นคือการ “ป้องกันความเสี่ยง” และรักษากำไรระยะยาว
+            📊 บางช่วงเวลาอาจไม่มีสัญญาณเข้าเทรด
+            <br />
+            เพื่อหลีกเลี่ยงความเสี่ยงที่ไม่จำเป็น และรักษาเสถียรภาพของพอร์ตในระยะยาว
           </p>
           <p className="text-sm sm:text-base md:text-lg text-slate-300 mt-3 italic font-medium">
-            💡 ระบบของเราไม่ได้ออกแบบมาเพื่อรวยเร็ว<br />
-            แต่ออกแบบมาเพื่ออยู่รอดและเติบโตในระยะยาว
+            💡 ระบบนี้ไม่ได้ออกแบบมาเพื่อผลตอบแทนระยะสั้น<br />
+            แต่เน้นการบริหารความเสี่ยงและการเติบโตอย่างยั่งยืน
           </p>
         </div>
 
@@ -46,12 +47,12 @@ export default function Home() {
       {/* Right side - Features (responsive) */}
       <div className="card w-full mt-6 md:mt-0">
         <ul className="space-y-3 text-sm sm:text-base md:text-lg">
-          <li>📡 EA รับสัญญาณจากเซิร์ฟเวอร์กลาง เพื่อเปิดออเดอร์ใน MT5 อัตโนมัติ</li>
-          <li>💰 คำนวณ Lot จากต้นทุน อัตโนมัติตาม % Risk หรือใช้ Fixed Lot</li>
-          <li>🛑 ตั้ง Stop Loss และ Take Profit อัตโนมัสทุกครั้งที่เปิดออเดอร์</li>
-          <li>🔄 รองรับ XAUUSD, EURUSD, GBPUSD, USDJPY และหุ้น (AMD, AAPL, TSLA)</li>
-          <li>⚡ ใช้ RR 1:2 ถึงแม้จะเสีย 5 ไม้ ชนะ 5 ไม้ ก็ยังมีกำไรสุทธิได้ในระยะยาว</li>
-          <li>🔐 ปรับค่า % Risk และ Lot ได้ตามข้อกำหนดของโบรกเกอร์</li>
+          <li>📡 EA รับสัญญาณจากเซิร์ฟเวอร์กลาง และเปิดออเดอร์ใน MT5 โดยอัตโนมัติ</li>
+          <li>💰 คำนวณขนาด Lot อัตโนมัติตาม % Risk หรือกำหนด Fixed Lot ได้</li>
+          <li>🛑 ตั้ง Stop Loss และ Take Profit อัตโนมัติทุกครั้งที่เปิดออเดอร์</li>
+          <li>🔄 รองรับ Forex, Gold (XAUUSD), Crypto และหุ้นบางตัว</li>
+          <li>⚡ ใช้อัตราส่วน Risk:Reward 1:2 เพื่อเพิ่มโอกาสทำกำไรในระยะยาว</li>
+          <li>🔐 ปรับค่า % Risk และขนาด Lot ได้ตามต้องการ</li>
         </ul>
         <p className="text-xs text-slate-400 mt-4 text-center">
           👉 อ่านรายละเอียดเพิ่มเติมที่หน้า <a href="/features" className="underline">คุณสมบัติ</a>

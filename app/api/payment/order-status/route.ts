@@ -10,12 +10,12 @@ export async function GET(req: Request) {
   const tx = await prisma.transaction.findFirst({ where: { txHash: orderId } });
   if (!tx) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // ✅ ลบ qrcodeUrl ออก (ไม่ต้องส่งกลับไป)
   return NextResponse.json({
     status: tx.status,
     userId: tx.userId,
     method: tx.method,
     amount: tx.amount,
-    packageType: tx.packageType,  // ✅ เพิ่ม packageType ใน response
-    qrcodeUrl: tx.qrcodeUrl || "https://pay.binance.com/qr/TKGucdubahmptjs4BeeAyWjFzxShVGSAq4"
+    packageType: tx.packageType,
   });
 }

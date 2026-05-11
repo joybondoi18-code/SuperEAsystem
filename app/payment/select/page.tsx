@@ -29,7 +29,8 @@ export default function SelectPackagePage() {
 
       const data = await res.json();
       if (res.ok && data.intent?.orderId) {
-        router.push(`/payment/${data.intent.orderId}`);
+        // ✅ แก้ตรงนี้: จาก /payment/... เป็น /payment-status/...
+        router.push(`/payment/${data.intent.orderId}`); // ✅
       } else {
         alert("เกิดข้อผิดพลาด กรุณาลองใหม่");
       }

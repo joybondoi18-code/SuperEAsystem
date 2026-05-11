@@ -1,4 +1,5 @@
-// lib/binance/withdraw.ts
+import ccxt from "ccxt";
+
 const IS_MOCK = process.env.USE_REAL_BINANCE_API !== 'true';
 
 export async function withdrawToUser(
@@ -7,21 +8,18 @@ export async function withdrawToUser(
   asset: string = "USDT"
 ): Promise<{ success: boolean; txId?: string; message?: string }> {
   
-  // ✅ Mock Mode (ตอนนี้ยังไม่มี VPS)
+  // Mock Mode
   if (IS_MOCK) {
     console.log(`[MOCK] Withdraw ${amount} ${asset} to ${address}`);
-    
-    // สุ่ม delay เหมือนกำลังทำงาน
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
     return {
       success: true,
       txId: `MOCK_TX_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      message: "⚠️ Mock mode: ไม่ได้โอนเงินจริง (จะทำงานจริงเมื่อมี VPS และตั้งค่า USE_REAL_BINANCE_API=true)",
+      message: "⚠️ Mock mode: ไม่ได้โอนเงินจริง",
     };
   }
   
-  // ✅ Real Mode (ตอนมี VPS แล้ว)
+  // ✅ Real Mode ใช้ Binance API จริง
   try {
     const apiKey = process.env.BINANCE_WITHDRAW_API_KEY;
     const secretKey = process.env.BINANCE_WITHDRAW_SECRET;
@@ -30,13 +28,22 @@ export async function withdrawToUser(
       throw new Error("Binance Withdraw API keys not configured");
     }
     
-    // TODO: เรียก Binance API จริง
-    // const result = await binanceClient.withdraw(asset, address, amount);
+    // ✅ ใช้ ccxt สร้าง Binance client
+    const exchange = new ccxt.binance({
+      apiKey: apiKey,
+      secret: secretKey,
+      enableRateLimit: true,
+    });
     
-    // ชั่วคราวยังไม่ทำของจริง
+    // ✅ ถอนเงินไปยัง address
+    const result = await exchange.withdraw(asset, amount, address);
+    
+    console.log(`✅ Withdraw success: ${amount} ${asset} to ${address}`, result);
+    
     return {
-      success: false,
-      message: "Real withdraw not implemented yet. Please configure Binance API.",
+      success: true,
+      txId: result.id,
+      message: "ถอนเงินสำเร็จ",
     };
     
   } catch (error: any) {
