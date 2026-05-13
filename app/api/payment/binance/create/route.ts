@@ -18,7 +18,7 @@ export async function POST() {
     type: "upgrade",
     amount: UPGRADE_PRICE,
     method: "binance",
-    status: "pending",
+    status: "PENDING",
     txHash: intent.orderId, 
     qrcodeUrl: intent.qrCodeContent || null, // ✅ ใช้ชื่อที่มีอยู่จริง
 

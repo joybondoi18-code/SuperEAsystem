@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         type: "upgrade",
         amount: amount || 20,
         method: "binance",
-        status: "pending",
+        status: "PENDING",
         txHash: orderId,
         // qrcodeUrl ไม่ต้องบันทึก เพราะหน้า PaymentStatus จะสร้าง QR เอง
         packageType: packageType,

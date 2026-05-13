@@ -117,6 +117,12 @@ model licenses {
   id           Int      @id @default(autoincrement())
   api_key      String   @unique
   mt5_login    String
+  email        String?
+  is_active    Boolean  @default(true)
+  is_admin     Boolean  @default(false)
+  expires_at   DateTime
+  allowed_ips  String[]  // store as JSON array in PostgreSQL
+  magic_number Int       @default(123456)
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
   

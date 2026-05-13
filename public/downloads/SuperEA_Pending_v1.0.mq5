@@ -15,9 +15,9 @@ input int      PollingInterval = 5;
 input int      DeviationPoints = 200;
 input double   RiskPercent = 10.0;
 input bool     UseFixedLot = false;
-input double   FixedLot = 0.1;
+input double   FixedLot = 0.01;
 input bool     DebugMode = true;
-input int      PendingDistance = 50;   // ระยะห่างจากราคาปัจจุบัน (จุด) - ตั้ง 50 จุด
+input int      PendingDistance = 20;   // ระยะห่างจากราคาปัจจุบัน (จุด)
 
 // ===================== GLOBAL VARIABLES =====================
 string g_login = "";
@@ -155,6 +155,9 @@ string FindSymbolAuto(string searchSymbol)
 }
 
 //+------------------------------------------------------------------+
+//| แปลงชื่อกลางเป็นชื่อจริงตามโบรกเกอร์                            |
+//| รองรับ: XM (#), Exness (m), FBS/FTMO (มาตรฐาน), อื่นๆ (ค้นหา)  |
+//+------------------------------------------------------------------+
 string MapSymbolForBroker(string symbol)
 {
    string broker = ToUpper(g_broker);
@@ -163,34 +166,50 @@ string MapSymbolForBroker(string symbol)
    
    Print("🔍 Mapping: ", originalSymbol, " for broker: ", broker);
    
-   if(symbol == "XAUUSD" || symbol == "GOLD")
+   // ✅ XM Group (ใช้ # ต่อท้ายทุกตัว)
+   if(StringFind(broker, "XM") >= 0)
    {
-      if(StringFind(broker, "XM") >= 0) return "GOLD";
-      if(StringFind(broker, "EXNESS") >= 0) return "XAUUSDm";
-      return "XAUUSD";
+      if(symbol == "XAUUSD" || symbol == "GOLD") return "GOLD#";
+      if(symbol == "EURUSD") return "EURUSD#";
+      if(symbol == "GBPUSD") return "GBPUSD#";
+      if(symbol == "USDJPY") return "USDJPY#";
+      if(symbol == "AUDUSD") return "AUDUSD#";
+      if(symbol == "USDCAD") return "USDCAD#";
+      if(symbol == "NZDUSD") return "NZDUSD#";
+      if(symbol == "USDCHF") return "USDCHF#";
+      if(symbol == "BTCUSD") return "BTCUSD#";
+      
+      // ถ้าไม่ตรงกับที่กำหนดไว้ ให้เติม # ต่อท้าย
+      return symbol + "#";
    }
    
-   if(symbol == "EURUSD")
+   // ✅ Exness (ใช้ m ต่อท้าย)
+   if(StringFind(broker, "EXNESS") >= 0)
    {
-      if(StringFind(broker, "XM") >= 0) return "EURUSDm";
-      if(StringFind(broker, "EXNESS") >= 0) return "EURUSDm";
-      return "EURUSD";
+      if(symbol == "XAUUSD" || symbol == "GOLD") return "XAUUSDm";
+      if(symbol == "EURUSD") return "EURUSDm";
+      if(symbol == "GBPUSD") return "GBPUSDm";
+      if(symbol == "USDJPY") return "USDJPYm";
+      if(symbol == "AUDUSD") return "AUDUSDm";
+      if(symbol == "USDCAD") return "USDCADm";
+      if(symbol == "NZDUSD") return "NZDUSDm";
+      if(symbol == "USDCHF") return "USDCHFm";
+      if(symbol == "BTCUSD") return "BTCUSDm";
+      
+      return symbol + "m";
    }
    
-   if(symbol == "GBPUSD")
+   // ✅ FBS / FTMO / Octa / Pepperstone (ใช้ชื่อมาตรฐาน)
+   if(StringFind(broker, "FBS") >= 0 || 
+      StringFind(broker, "FTMO") >= 0 ||
+      StringFind(broker, "OCTA") >= 0 ||
+      StringFind(broker, "PEPPERSTONE") >= 0)
    {
-      if(StringFind(broker, "XM") >= 0) return "GBPUSDm";
-      if(StringFind(broker, "EXNESS") >= 0) return "GBPUSDm";
-      return "GBPUSD";
+      if(symbol == "XAUUSD" || symbol == "GOLD") return "XAUUSD";
+      return symbol;
    }
    
-   if(symbol == "USDJPY")
-   {
-      if(StringFind(broker, "XM") >= 0) return "USDJPYm";
-      if(StringFind(broker, "EXNESS") >= 0) return "USDJPYm";
-      return "USDJPY";
-   }
-   
+   // ✅ ค้นหาอัตโนมัติสำหรับโบรกอื่นๆ
    string autoSymbol = FindSymbolAuto(originalSymbol);
    if(autoSymbol != "") return autoSymbol;
    
