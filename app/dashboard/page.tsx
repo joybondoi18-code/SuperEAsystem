@@ -87,6 +87,11 @@ export default function Dashboard() {
   // ========== จบ State Web Push ==========
   const [orderHistory, setOrderHistory] = useState([]);
 
+  
+  const [walletAddress, setWalletAddress] = useState("");     // ✅ เพิ่ม
+  const [network, setNetwork] = useState("TRC20");            // ✅ เพิ่ม
+  const [accountName, setAccountName] = useState("");         // ✅ เพิ่ม
+
   const refresh = () => { fetch("/api/users/me").then(async r => setMe((await r.json()).user)); };
   useEffect(() => { refresh(); }, []);
 
@@ -363,74 +368,94 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* -------- ถอนโบนัส (Binance เท่านั้น) -------- */}
-      <div className="card">
-        <h2 className="text-xl font-semibold mb-3">ถอนโบนัส (USDT)</h2>
-        <div className="space-y-3">
-          <div>
-            <label>จำนวนเงิน (USDT)</label>
-            <input
-              type="number"
-              min={1}
-              value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(parseFloat(e.target.value || "0"))}
-            />
-          </div>
+      {/* -------- ถอนโบนัส (USDT) -------- */}
+<div className="card">
+  <h2 className="text-xl font-semibold mb-3">ถอนโบนัส (USDT)</h2>
+  <div className="space-y-3">
+    <div>
+      <label>จำนวนเงิน (USDT)</label>
+      <input
+        type="number"
+        min={1}
+        value={withdrawAmount}
+        onChange={(e) => setWithdrawAmount(parseFloat(e.target.value || "0"))}
+      />
+    </div>
 
-          <div className="mt-2 space-y-2">
-            <label>🆔 Binance Pay ID / Email Binance</label>
-            <input 
-              type="text" 
-              placeholder="กรอก Binance Pay ID หรืออีเมล Binance" 
-              value={binancePayId}
-              onChange={(e) => setBinancePayId(e.target.value)}
-            />
+    <div className="mt-2 space-y-2">
+      <label>💰 Wallet Address (รับ USDT)</label>
+      <input 
+        type="text" 
+        placeholder="กรอก Wallet Address (เช่น T... หรือ 0x...)" 
+        value={walletAddress}
+        onChange={(e) => setWalletAddress(e.target.value)}
+      />
+      <p className="text-xs text-gray-500">
+        ตัวอย่าง: TKGucdubahmptjs4BeeAyWjFzxShVGSAq4
+      </p>
 
-            <label>👤 ชื่อบัญชี Binance (ชื่อ-นามสกุล)</label>
-            <input 
-              type="text" 
-              placeholder="กรอกชื่อบัญชี Binance" 
-              value={binanceName}
-              onChange={(e) => setBinanceName(e.target.value)}
-            />
-          </div>
+      <label>🌐 เครือข่าย (Network)</label>
+      <select 
+        value={network}
+        onChange={(e) => setNetwork(e.target.value)}
+        className="w-full p-2 border rounded"
+      >
+        <option value="TRC20">TRC20 (USDT - Tron) - แนะนำ</option>
+        <option value="BEP20">BEP20 (USDT - BSC)</option>
+        <option value="ERC20">ERC20 (USDT - Ethereum) - ค่าธรรมเนียมสูง</option>
+      </select>
 
-          <button
-            className="btn mt-3 w-full"
-            onClick={async () => {
-              if (!withdrawAmount || withdrawAmount <= 0) {
-                alert("⚠️ กรุณากรอกจำนวนเงินให้ถูกต้อง");
-                return;
-              }
-              
-              if (!binancePayId && !binanceName) {
-                alert("⚠️ กรุณากรอกข้อมูล Binance Pay ID หรือชื่อบัญชี");
-                return;
-              }
+      <label>👤 ชื่อบัญชี (สำหรับตรวจสอบ)</label>
+      <input 
+        type="text" 
+        placeholder="กรอกชื่อ-นามสกุล" 
+        value={accountName}
+        onChange={(e) => setAccountName(e.target.value)}
+      />
+    </div>
 
-              const accountInfo = `Binance Pay ID: ${binancePayId}, ชื่อบัญชี: ${binanceName}`;
+    <button
+      className="btn mt-3 w-full"
+      onClick={async () => {
+        if (!withdrawAmount || withdrawAmount <= 0) {
+          alert("⚠️ กรุณากรอกจำนวนเงินให้ถูกต้อง");
+          return;
+        }
+        
+        if (!walletAddress) {
+          alert("⚠️ กรุณากรอก Wallet Address");
+          return;
+        }
+        
+        if (!network) {
+          alert("⚠️ กรุณาเลือกเครือข่าย");
+          return;
+        }
 
-              await fetch("/api/withdraw/request", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  amount: withdrawAmount,
-                  method: "binance",
-                  accountInfo,
-                }),
-              });
+        await fetch("/api/withdraw/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: withdrawAmount,
+            method: "binance",
+            address: walletAddress,      // ✅ wallet address
+            network: network,            // ✅ TRC20/BEP20/ERC20
+            accountName: accountName,    // ✅ ชื่อบัญชี
+          }),
+        });
 
-              alert("✅ ส่งคำขอถอนแล้ว (รอ admin อนุมัติ)");
-              
-              setWithdrawAmount(0);
-              setBinancePayId("");
-              setBinanceName("");
-            }}
-          >
-            💸 ส่งคำขอถอน Binance
-          </button>
-        </div>
-      </div>
+        alert("✅ ส่งคำขอถอนแล้ว รอแอดมินตรวจสอบและโอนเงินให้");
+        
+        setWithdrawAmount(0);
+        setWalletAddress("");
+        setNetwork("TRC20");
+        setAccountName("");
+      }}
+    >
+      💸 ส่งคำขอถอน
+    </button>
+  </div>
+</div>
 
       {/* -------- ระบบแนะนำเพื่อน -------- */}
       <div className="card md:col-span-2 mt-0">

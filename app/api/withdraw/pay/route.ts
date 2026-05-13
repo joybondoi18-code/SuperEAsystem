@@ -9,56 +9,82 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: "forbidden" }, { status: 403 });
     }
 
-    const { id } = await req.json();
+    const { id, paymentRef } = await req.json();
+    
+    if (!paymentRef) {
+      return NextResponse.json({ 
+        success: false, message: "กรุณาระบุเลขที่อ้างอิงการโอน" 
+      }, { status: 400 });
+    }
+
     const t = await prisma.transaction.findUnique({ where: { id } });
 
-    if (!t || t.status !== "approved") {
-      return NextResponse.json({ success: false, message: "ไม่พบรายการถอนที่อนุมัติแล้ว" });
+    if (!t || t.type !== "withdraw") {
+      return NextResponse.json({ 
+        success: false, message: "ไม่พบรายการถอน" 
+      }, { status: 404 });
+    }
+
+    // ✅ ป้องกันการจ่ายซ้ำ
+    if (t.status === "PAID") {
+      return NextResponse.json({ 
+        success: false, message: "รายการนี้จ่ายเงินไปแล้ว" 
+      }, { status: 400 });
+    }
+
+    if (t.status !== "APPROVED") {
+      return NextResponse.json({ 
+        success: false, message: "รายการนี้ยังไม่อนุมัติ" 
+      }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: t.userId } });
     if (!user) {
-      return NextResponse.json({ success: false, message: "ไม่พบบัญชีผู้ใช้" }, { status: 404 });
+      return NextResponse.json({ 
+        success: false, message: "ไม่พบบัญชีผู้ใช้" 
+      }, { status: 404 });
     }
 
-    // 💰 ตรวจช่องทางถอน
-    let paymentResult = null;
-
-    if (t.method === "binance") {
-      // 🪙 ถอนผ่าน Binance (สมมติเรียก Binance API)
-      // *** ตรงนี้ใส่โค้ด Binance จริงได้ภายหลัง ***
-      console.log(`ส่งคำสั่งถอน USDT ไปยัง Binance ของ ${user.email}`);
-      paymentResult = { success: true, ref: "BINANCE_TX_12345" };
-
-    } else if (t.method === "bank") {
-      // 🏦 ถอนผ่านบัญชีธนาคาร
-      // *** ตรงนี้ใส่โค้ดเชื่อม API ธนาคารได้ภายหลัง ***
-      console.log(`โอนเงิน ${t.amount} บาท เข้าบัญชีธนาคารของ ${user.email}`);
-      paymentResult = { success: true, ref: "BANK_TX_67890" };
-
-    } else {
-      // ❌ ไม่มี method ที่ระบุไว้
-      return NextResponse.json({ success: false, message: "ช่องทางการถอนเงินไม่ถูกต้อง" }, { status: 400 });
+    // ✅ ตรวจสอบยอดอีกครั้ง
+    if (user.balance < t.amount) {
+      return NextResponse.json({ 
+        success: false, message: "ยอดโบนัสไม่พอสำหรับการจ่ายเงินนี้" 
+      }, { status: 400 });
     }
 
-    if (!paymentResult?.success) {
-      return NextResponse.json({ success: false, message: "การจ่ายเงินจริงล้มเหลว" }, { status: 500 });
-    }
+    // ✅ ใช้ transaction เพื่อความปลอดภัย: หัก balance + อัปเดตสถานะ
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: t.amount } }
+      }),
+      prisma.transaction.update({
+        where: { id: t.id },
+        data: { 
+          status: "PAID",
+          paidAt: new Date(),
+          paymentRef: paymentRef,
+          adminId: auth.uid
+        }
+      })
+    ]);
 
-    // ✅ อัปเดตสถานะการถอนเป็น paid
-    await prisma.transaction.update({
-      where: { id: t.id },
+    console.log(`✅ Admin ${auth.email} จ่ายเงิน ${t.amount} ให้ user ${user.email} แล้ว`);
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "ยืนยันการจ่ายเงินสำเร็จ",
       data: {
-        status: "paid",
-        paidAt: new Date(),
-        paymentRef: paymentResult.ref, // 🔹 เก็บรหัสอ้างอิงธุรกรรม
-      },
+        user: user.email,
+        amount: t.amount,
+        paymentRef: paymentRef
+      }
     });
-
-    return NextResponse.json({ success: true, message: "ทำเครื่องหมายว่าจ่ายเงินจริงแล้ว" });
 
   } catch (error) {
     console.error("Withdraw payment error:", error);
-    return NextResponse.json({ success: false, message: "เกิดข้อผิดพลาดในระบบ" }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, message: "เกิดข้อผิดพลาดในระบบ" 
+    }, { status: 500 });
   }
 }

@@ -96,26 +96,59 @@ export default function Admin() {
     return w.status === statusFilter;
   });
 
-  // ✅ ใช้ API ใหม่สำหรับอนุมัติถอนเงิน
   const handleApproveWithdraw = async (withdrawId: string, amount: number, userEmail: string) => {
-    if (!confirm(`ยืนยันอนุมัติการถอน $${amount} ให้ ${userEmail}?`)) return;
+  if (!confirm(`ยืนยันอนุมัติการถอน ${amount} USDT ให้ ${userEmail}?`)) return;
+  
+  setApprovingId(withdrawId);
+  try {
+    // ✅ ขั้นตอนที่ 1: อนุมัติ (APPROVED)
+    const approveRes = await fetch("/api/withdraw/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: withdrawId })
+    });
+    const approveData = await approveRes.json();
     
-    setApprovingId(withdrawId);
-    try {
-      const res = await fetch("/api/admin/withdraw", {
+    if (!approveData.success) {
+      alert("❌ อนุมัติไม่สำเร็จ: " + (approveData.message || ""));
+      refresh();
+      setApprovingId(null);
+      return;
+    }
+    
+    // ✅ ถ้าอนุมัติสำเร็จ ให้ถามว่าโอนเงินให้ user แล้วหรือยัง
+    const paymentRef = prompt(
+      "✅ อนุมัติสำเร็จ!\n\n" +
+      "กรุณาโอนเงินให้ผู้ใช้\n" +
+      "แล้วใส่เลขที่อ้างอิงการโอน (Reference Number)\n\n" +
+      "ถ้ายังไม่ได้โอน ให้กด Cancel"
+    );
+    
+    if (paymentRef) {
+      // ✅ ขั้นตอนที่ 2: ยืนยันการจ่ายเงิน (PAID)
+      const payRes = await fetch("/api/withdraw/pay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ withdrawId })
+        body: JSON.stringify({ id: withdrawId, paymentRef })
       });
-      const data = await res.json();
-      alert(data.success ? "✅ อนุมัติสำเร็จ (เงินจะถูกโอนอัตโนมัติ)" : "❌ เกิดข้อผิดพลาด: " + (data.error || ""));
-      refresh();
-    } catch (error) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-    } finally {
-      setApprovingId(null);
+      const payData = await payRes.json();
+      
+      if (payData.success) {
+        alert(`✅ จ่ายเงินสำเร็จ!\nเลขที่อ้างอิง: ${paymentRef}\nยอดเงิน ${amount} USDT จะถูกหักจากผู้ใช้เรียบร้อย`);
+      } else {
+        alert(`⚠️ อนุมัติสำเร็จ แต่บันทึกการจ่ายไม่สำเร็จ: ${payData.message}\nกรุณาจ่ายเงินด้วยตนเองแล้วกดปุ่ม "ยืนยันการโอน" ที่หน้าแยก`);
+      }
+    } else {
+      alert("✅ อนุมัติสำเร็จ (ยังไม่ได้บันทึกการจ่ายเงิน)");
     }
-  };
+    
+    refresh();
+  } catch (error) {
+    alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+  } finally {
+    setApprovingId(null);
+  }
+};  
 
   const handleApproveBank = async () => {
     if (!bankUserId.trim()) return alert("กรุณากรอก User ID");
@@ -149,7 +182,7 @@ export default function Admin() {
         <div className="card">
           <h3 className="text-lg font-semibold text-gray-600">รอถอนเงิน</h3>
           <p className="text-2xl font-bold text-orange-500">
-            {withdraws.filter(w => w.status === "pending").length} รายการ
+            {withdraws.filter(w => w.status === "PENDING").length} รายการ
           </p>
         </div>
         <div className="card">
@@ -311,9 +344,9 @@ export default function Admin() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">ทั้งหมด</option>
-              <option value="pending">รออนุมัติ</option>
-              <option value="approved">อนุมัติแล้ว</option>
-              <option value="failed">ล้มเหลว</option>
+              <option value="PENDING">รออนุมัติ</option>
+              <option value="APPROVED">อนุมัติแล้ว</option>
+              <option value="PAID">จ่ายแล้ว</option>
             </select>
           </div>
         </div>
@@ -324,65 +357,123 @@ export default function Admin() {
                 <th className="p-3 text-left border-b">ผู้ใช้</th>
                 <th className="p-3 text-left border-b">จำนวน</th>
                 <th className="p-3 text-left border-b">ช่องทาง</th>
+                 <th className="p-3 text-left border-b">Wallet Address</th>
                 <th className="p-3 text-left border-b">สถานะ</th>
                 <th className="p-3 text-left border-b">วันที่ขอ</th>
                 <th className="p-3 text-left border-b">จัดการ</th>
               </tr>
             </thead>
             <tbody>
-              {filteredWithdraws.map(w => (
-                <tr key={w.id} className="hover:bg-gray-50">
-                  <td className="p-3 border-b">
-                    <div>
-                      <div className="font-medium">{w.user.email}</div>
-                      <div className="text-xs text-gray-500">{w.userId}</div>
-                    </div>
-                  </td>
-                  <td className="p-3 border-b font-bold">${w.amount.toFixed(2)}</td>
-                  <td className="p-3 border-b">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                      {w.method || "bank"}
-                    </span>
-                    {w.accountInfo && (
-                      <div className="text-xs text-gray-600 mt-1">{w.accountInfo}</div>
-                    )}
-                  </td>
-                  <td className="p-3 border-b">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      w.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      w.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {w.status === 'pending' ? 'รออนุมัติ' : 
-                       w.status === 'approved' ? 'อนุมัติแล้ว' : 'ล้มเหลว'}
-                    </span>
-                  </td>
-                  <td className="p-3 border-b text-sm">
-                    {new Date(w.createdAt).toLocaleDateString('th-TH')}
-                  </td>
-                  <td className="p-3 border-b">
-                    {w.status === "pending" ? (
-                      <button 
-                        className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-sm font-medium disabled:opacity-50"
-                        onClick={() => handleApproveWithdraw(w.id, w.amount, w.user.email)}
-                        disabled={approvingId === w.id}
-                      >
-                        {approvingId === w.id ? "กำลังอนุมัติ..." : "อนุมัติ"}
-                      </button>
-                    ) : (
-                      <span className="text-gray-400 text-sm">ดำเนินการแล้ว</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredWithdraws.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-500">
-                    ไม่พบคำขอถอนเงิน
-                  </td>
-                </tr>
+  {filteredWithdraws.map(w => {
+    // พยายาม parse accountInfo ถ้าเป็น JSON
+    let address = "";
+    let network = "";
+    let accountName = "";
+    
+    try {
+      const parsed = JSON.parse(w.accountInfo || "{}");
+      if (parsed.address) address = parsed.address;
+      if (parsed.network) network = parsed.network;
+      if (parsed.name) accountName = parsed.name;
+    } catch {
+      // ถ้า parse ไม่ได้ ให้ใช้ accountInfo เฉยๆ
+      address = w.accountInfo || "";
+    }
+    
+    return (
+      <tr key={w.id} className="hover:bg-gray-50">
+        <td className="p-3 border-b">
+          <div>
+            <div className="font-medium">{w.user?.email || "ไม่ทราบอีเมล"}</div>
+            <div className="text-xs text-gray-500">{w.userId}</div>
+          </div>
+        </td>
+        
+        <td className="p-3 border-b font-bold">{w.amount.toFixed(2)} USDT</td>
+        
+        <td className="p-3 border-b">
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+            {w.method || "binance"}
+          </span>
+        </td>
+        
+        {/* ✅ คอลัมน์ Wallet Address */}
+        <td className="p-3 border-b">
+          {address ? (
+            <div className="space-y-1">
+              <div className="text-sm font-mono break-all max-w-[250px]">
+                {address}
+              </div>
+              {network && (
+                <div className="text-xs">
+                  <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-700">
+                    🌐 {network}
+                  </span>
+                </div>
               )}
-            </tbody>
+              {accountName && (
+                <div className="text-xs text-gray-500">
+                  👤 {accountName}
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(address);
+                  alert("📋 คัดลอก Wallet Address แล้ว");
+                }}
+                className="text-xs text-blue-500 hover:underline"
+              >
+                📋 คัดลอก
+              </button>
+            </div>
+          ) : (
+            <span className="text-gray-400 text-sm">ไม่มีข้อมูล</span>
+          )}
+        </td>
+        
+        <td className="p-3 border-b">
+          <span className={`px-2 py-1 rounded text-xs ${
+            w.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+            w.status === 'PAID' ? 'bg-blue-100 text-blue-800' :
+            w.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-red-100 text-red-800'
+          }`}>
+            {w.status === 'PAID' ? 'จ่ายแล้ว' :
+            w.status === 'APPROVED' ? 'อนุมัติแล้ว (รอโอน)' : 
+            w.status === 'PENDING' ? 'รออนุมัติ' : 
+            'ล้มเหลว'}
+          </span>
+        </td>
+        
+        <td className="p-3 border-b text-sm">
+          {new Date(w.createdAt).toLocaleDateString('th-TH')}
+        </td>
+        
+        <td className="p-3 border-b">
+          {w.status === "PENDING" ? (
+            <button 
+              className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-sm font-medium disabled:opacity-50"
+              onClick={() => handleApproveWithdraw(w.id, w.amount, w.user?.email || w.userId)}
+              disabled={approvingId === w.id}
+            >
+              {approvingId === w.id ? "กำลังอนุมัติ..." : "อนุมัติ"}
+            </button>
+          ) : (
+            <span className="text-gray-400 text-sm">ดำเนินการแล้ว</span>
+          )}
+        </td>
+      </tr>
+    );
+  })}
+  {filteredWithdraws.length === 0 && (
+    <tr>
+      <td colSpan={7} className="p-6 text-center text-gray-500">
+        ไม่พบคำขอถอนเงิน
+      </td>
+    </tr>
+  )}
+</tbody>            
+          
           </table>
         </div>
       </div>

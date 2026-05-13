@@ -1,71 +1,23 @@
+/////////////////////////////////////////////////////
+// ✅ Prisma schema for tradebot-system-bot project
+/////////////////////////////////////////////////////
+
 generator client {
   provider = "prisma-client-js"
 }
+
+/////////////////////////////////////////////////////
+// Database connection
+/////////////////////////////////////////////////////
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                   String        @id @default(cuid())
-  email                String        @unique
-  password             String
-  role                 Role          @default(USER)
-  referralCode         String        @unique
-  referredBy           String?
-  isActive             Boolean       @default(false)
-  planExpiresAt        DateTime?
-  balance              Float         @default(0)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  binanceApiKey        String?
-  binanceSecretKey     String?
-  packageType          PackageType?
-  vpsId                String?
-  approvedTransactions Transaction[] @relation("AdminApproval")
-  transactions         Transaction[]
-}
-
-model Transaction {
-  id          String       @id @default(cuid())
-  userId      String
-  type        String
-  amount      Float
-  method      String
-  status      String
-  refUserId   String?
-  txHash      String?
-  createdAt   DateTime     @default(now())
-  qrcodeUrl   String?
-  approvedAt  DateTime?
-  paidAt      DateTime?
-  paymentRef  String?
-  accountInfo String?
-  adminId     String?
-  packageType PackageType?
-  admin       User?        @relation("AdminApproval", fields: [adminId], references: [id])
-  user        User         @relation(fields: [userId], references: [id])
-}
-
-model BotSetting {
-  id         String   @id @default(cuid())
-  isRunning  Boolean  @default(false)
-  lastToggle DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-model userBotMapping {
-  id         Int      @id @default(autoincrement())
-  email      String   @unique
-  mt5_login  String   @unique
-  mt5_server String
-  mt5_broker String
-  status     String   @default("active")
-  created_at DateTime @default(now())
-
-  @@map("user_bot_mapping")
-}
+/////////////////////////////////////////////////////
+// Enums
+/////////////////////////////////////////////////////
 
 enum Role {
   USER
@@ -75,4 +27,100 @@ enum Role {
 enum PackageType {
   STANDARD
   PREMIUM
+}
+
+// ✅ เพิ่ม enum สำหรับระบบถอนโบนัส
+enum WithdrawStatus {
+  PENDING   // รอ Admin ตรวจสอบ
+  APPROVED  // Admin อนุมัติแล้ว (ยังไม่จ่าย)
+  PAID      // จ่ายเงินจริงแล้ว
+  REJECTED  // ไม่อนุมัติ
+}
+
+/////////////////////////////////////////////////////
+// Models
+/////////////////////////////////////////////////////
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  role          Role           @default(USER)
+  referralCode  String         @unique
+  referredBy    String?
+  isActive      Boolean        @default(false)
+  planExpiresAt DateTime?
+  balance       Float          @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  transactions  Transaction[]
+  
+  approvedTransactions Transaction[] @relation("AdminApproval")
+  binanceApiKey    String?
+  binanceSecretKey String?
+  
+  packageType   PackageType?
+  vpsId         String?
+  
+  // ✅ สำหรับเชื่อมต่อ EA Forex
+  mt5Login      String?   @unique  // MT5 Account Number
+  apiKey        String?   @unique  // UUID สำหรับ EA
+  eaConnectedAt DateTime?           // วันที่เชื่อมต่อ EA ครั้งแรก
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // 'upgrade' | 'bonus' | 'withdraw'
+  amount      Float
+  method      String   // 'binance' | 'bank' | 'system'
+  accountInfo String?  // ข้อมูลบัญชีธนาคาร / Binance ID / Wallet Address
+  status      WithdrawStatus @default(PENDING)  // ✅ เปลี่ยนเป็น enum
+  refUserId   String?
+  txHash      String?
+  qrcodeUrl   String?
+  createdAt   DateTime @default(now())
+  
+  approvedAt DateTime?   // วันที่อนุมัติ
+  paidAt     DateTime?   // วันที่จ่ายเงินจริง
+  paymentRef String?     // เลขอ้างอิงการโอน (TXID / เลขที่โอน)
+  
+  adminId     String?    // ID ของ admin ที่อนุมัติ
+  admin       User?      @relation(fields: [adminId], references: [id], name: "AdminApproval")
+  
+  packageType PackageType?
+  
+  // ความสัมพันธ์
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model BotSetting {
+  id          String   @id @default(cuid())
+  isRunning   Boolean  @default(false)
+  lastToggle  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model userBotMapping {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  mt5_login    String   @unique
+  mt5_server   String
+  mt5_broker   String
+  status       String   @default("active")
+  created_at   DateTime @default(now())
+  
+  @@map("user_bot_mapping")
+}
+
+model licenses {
+  id           Int      @id @default(autoincrement())
+  api_key      String   @unique
+  mt5_login    String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  
+  @@index([api_key])
+  @@index([mt5_login])
+  @@map("licenses")
 }

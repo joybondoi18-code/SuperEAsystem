@@ -118,7 +118,7 @@ export default function CryptoLayout({ children }) {
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-yellow-400">📌 ตั้งค่า API Key:</span>
                 <span className="text-gray-300">1. ใส่ IP:</span>
-                <code className="bg-black px-2 py-0.5 rounded text-yellow-400 font-mono">154.222.4.131</code>
+                <code className="bg-black px-2 py-0.5 rounded text-yellow-400 font-mono">139.180.219.206</code>
                 <span className="text-gray-300">2. เปิดสิทธิ์:</span>
                 <code className="bg-black px-2 py-0.5 rounded text-green-400">Enable Reading</code>
                 <span className="text-gray-300">+</span>

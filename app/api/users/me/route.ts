@@ -15,9 +15,9 @@ export async function GET() {
         planExpiresAt: true,
         balance: true,
         referralCode: true,
-        mt5Login: true,      // ✅ เพิ่ม
-        apiKey: true,        // ✅ เพิ่ม
-        eaConnectedAt: true, // ✅ เพิ่ม
+        mt5Login: true,
+        apiKey: true,
+        eaConnectedAt: true,
       }
     });
     
@@ -48,11 +48,12 @@ export async function GET() {
     const totalReferred = referredUsers.length;
 
     // 2. คำนวณยอดโบนัสที่ได้รับจริงแล้ว (จาก Transaction type="bonus")
+    // ✅ แก้ไข: เปลี่ยน "approved" เป็น "APPROVED" (ตัวพิมพ์ใหญ่)
     const bonusTransactions = await prisma.transaction.findMany({
       where: { 
         userId: auth.uid,
         type: "bonus",
-        status: "approved"
+        status: "APPROVED"   // ← แก้ตรงนี้
       }
     });
     const earnedBonus = bonusTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -71,9 +72,9 @@ export async function GET() {
         referralCode: user.referralCode,
         hasPaid,
         showAlert,
-        mt5Login: user.mt5Login,           // ✅ เพิ่ม
-        apiKey: user.apiKey,               // ✅ เพิ่ม
-        eaConnectedAt: user.eaConnectedAt, // ✅ เพิ่ม
+        mt5Login: user.mt5Login,
+        apiKey: user.apiKey,
+        eaConnectedAt: user.eaConnectedAt,
         referralStats: {
           totalReferred,
           expectedBonus,
